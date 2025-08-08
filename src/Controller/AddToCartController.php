@@ -30,7 +30,7 @@ readonly class AddToCartController
 
             $product = $this->productRepository->getByUuid($rawRequest['productUuid']);
             if (!$product) {
-                return JsonResponse::fromArray(['status' => 'error', 'message' => 'Не удалось обновить корзину.'])
+                return JsonResponse::fromArray(['status' => 'error', 'message' => 'Не удалось обновить корзину'])
                     ->withStatus(422);
             }
 
@@ -43,7 +43,11 @@ readonly class AddToCartController
                 $product->getPrice(),
                 $rawRequest['quantity'],
             ));
-            $this->cartManager->saveCart($cart);
+
+            if (!$this->cartManager->saveCart($cart)) {
+                return JsonResponse::fromArray(['status' => 'error', 'message' => 'Сервис временно недоступен'])
+                    ->withStatus(503);
+            }
 
             return JsonResponse::fromArray(['status' => 'success', 'cart' => $this->cartView->toArray($cart)])
                 ->withStatus(200);
