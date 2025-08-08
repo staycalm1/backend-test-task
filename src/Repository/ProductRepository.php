@@ -16,40 +16,40 @@ class ProductRepository
         $this->connection = $connection;
     }
 
-    public function getByUuid(string $uuid): Product
+    /**
+     * @throws \Doctrine\DBAL\Exception
+     */
+    public function getByUuid(string $uuid): ?Product
     {
-        $row = $this->connection->fetchOne(
-            "SELECT * FROM products WHERE uuid = " . $uuid,
-        );
-
-        if (empty($row)) {
-            throw new Exception('Product not found');
-        }
-
-        return $this->make($row);
+        $row = $this->connection->fetchAssociative("SELECT * FROM products WHERE uuid = ?", [$uuid]);
+        return $row ?
+            $this->make($row) :
+            null;
     }
 
+    /**
+     * @return array<int, Product>
+     * @throws \Doctrine\DBAL\Exception
+     */
     public function getByCategory(string $category): array
     {
         return array_map(
-            static fn (array $row): Product => $this->make($row),
-            $this->connection->fetchAllAssociative(
-                "SELECT id FROM products WHERE is_active = 1 AND category = " . $category,
-            )
+            fn (array $row): Product => $this->make($row),
+            $this->connection->fetchAllAssociative("SELECT * FROM products WHERE is_active = 1 AND category = ?", [$category])
         );
     }
 
     public function make(array $row): Product
     {
         return new Product(
-            $row['id'],
-            $row['uuid'],
-            $row['is_active'],
-            $row['category'],
-            $row['name'],
-            $row['description'],
-            $row['thumbnail'],
-            $row['price'],
+            id: $row['id'],
+            uuid: $row['uuid'],
+            isActive: $row['is_active'],
+            category: $row['category'],
+            name: $row['name'],
+            description: $row['description'],
+            thumbnail: $row['thumbnail'],
+            price: $row['price'],
         );
     }
 }

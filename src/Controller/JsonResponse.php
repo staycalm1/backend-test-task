@@ -7,12 +7,22 @@ namespace Raketa\BackendTestTask\Controller;
 use Psr\Http\Message\MessageInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
+use function json_encode;
+use const JSON_PRETTY_PRINT;
+use const JSON_UNESCAPED_SLASHES;
 
 /**
  * Класс заглушка
  */
 final class JsonResponse implements ResponseInterface
 {
+    public static function fromArray(array $data): ResponseInterface
+    {
+        $self = (new JsonResponse())->withHeader('Content-Type', 'application/json; charset=utf-8');
+        $self->getBody()->write(json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        return $self;
+    }
+
     public function getProtocolVersion(): string
     {
         // TODO: Implement getProtocolVersion() method.

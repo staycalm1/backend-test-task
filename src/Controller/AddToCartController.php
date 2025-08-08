@@ -2,13 +2,16 @@
 
 namespace Raketa\BackendTestTask\Controller;
 
+use Throwable;
+use Ramsey\Uuid\Uuid;
+use Psr\Log\LoggerInterface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
+use Raketa\BackendTestTask\View\CartView;
 use Raketa\BackendTestTask\Domain\CartItem;
 use Raketa\BackendTestTask\Repository\CartManager;
 use Raketa\BackendTestTask\Repository\ProductRepository;
-use Raketa\BackendTestTask\View\CartView;
-use Ramsey\Uuid\Uuid;
+use function json_decode;
 
 readonly class AddToCartController
 {
@@ -16,35 +19,39 @@ readonly class AddToCartController
         private ProductRepository $productRepository,
         private CartView $cartView,
         private CartManager $cartManager,
+        private LoggerInterface $logger,
     ) {
     }
 
     public function get(RequestInterface $request): ResponseInterface
     {
-        $rawRequest = json_decode($request->getBody()->getContents(), true);
-        $product = $this->productRepository->getByUuid($rawRequest['productUuid']);
+        try {
+            $rawRequest = json_decode($request->getBody()->getContents(), true);
 
-        $cart = $this->cartManager->getCart();
-        $cart->addItem(new CartItem(
-            Uuid::uuid4()->toString(),
-            $product->getUuid(),
-            $product->getPrice(),
-            $rawRequest['quantity'],
-        ));
+            $product = $this->productRepository->getByUuid($rawRequest['productUuid']);
+            if (!$product) {
+                return JsonResponse::fromArray(['status' => 'error', 'message' => 'Не удалось обновить корзину.'])
+                    ->withStatus(422);
+            }
 
-        $response = new JsonResponse();
-        $response->getBody()->write(
-            json_encode(
-                [
-                    'status' => 'success',
-                    'cart' => $this->cartView->toArray($cart)
-                ],
-                JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
-            )
-        );
+            $this->cartManager->setLogger($this->logger);
 
-        return $response
-            ->withHeader('Content-Type', 'application/json; charset=utf-8')
-            ->withStatus(200);
+            $cart = $this->cartManager->getCart();
+            $cart->addItem(new CartItem(
+                Uuid::uuid4()->toString(),
+                $product->getUuid(),
+                $product->getPrice(),
+                $rawRequest['quantity'],
+            ));
+            $this->cartManager->saveCart($cart);
+
+            return JsonResponse::fromArray(['status' => 'success', 'cart' => $this->cartView->toArray($cart)])
+                ->withStatus(200);
+        } catch (Throwable $t) {
+            $this->logger->error('AddToCartControllerError', ['exception' => $t->__toString()]);
+
+            return JsonResponse::fromArray(['status' => 'error', 'message' => 'Сервис временно недоступен'])
+                ->withStatus(503);
+        }
     }
 }

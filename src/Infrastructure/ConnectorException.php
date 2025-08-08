@@ -1,16 +1,19 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Raketa\BackendTestTask\Infrastructure;
 
-class ConnectorException implements \Throwable
+use Throwable;
+
+readonly class ConnectorException implements Throwable
 {
     public function __construct(
         private string $message,
         private int $code,
-        private ?\Throwable $previous,
-    ) { }
+        private ?Throwable $previous,
+    ) {
+    }
 
     public function getMessage(): string
     {
@@ -24,25 +27,25 @@ class ConnectorException implements \Throwable
 
     public function getFile(): string
     {
-        return $this->previous->getFile();
+        return $this->previous?->getFile();
     }
 
     public function getLine(): int
     {
-        return $this->previous->getLine();
+        return $this->previous?->getLine();
     }
 
     public function getTrace(): array
     {
-        return $this->previous->getTrace();
+        return $this->previous?->getTrace();
     }
 
     public function getTraceAsString(): string
     {
-        return $this->previous->getTraceAsString();
+        return $this->previous?->getTraceAsString();
     }
 
-    public function getPrevious(): ?\Throwable
+    public function getPrevious(): ?Throwable
     {
         return $this->previous;
     }

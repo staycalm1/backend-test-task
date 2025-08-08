@@ -1,52 +1,63 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Raketa\BackendTestTask\Repository;
 
-use Exception;
 use Psr\Log\LoggerInterface;
 use Raketa\BackendTestTask\Domain\Cart;
-use Raketa\BackendTestTask\Infrastructure\ConnectorFacade;
+use Raketa\BackendTestTask\Infrastructure\Connector;
+use Raketa\BackendTestTask\Infrastructure\ConnectorFactory;
+use Raketa\BackendTestTask\Infrastructure\ConnectorException;
+use function session_id;
 
-class CartManager extends ConnectorFacade
+class CartManager
 {
-    public $logger;
+    public ?LoggerInterface $logger;
+    private readonly Connector $connector;
 
-    public function __construct($host, $port, $password)
+    public function __construct(ConnectorFactory $connectorFactory)
     {
-        parent::__construct($host, $port, $password, 1);
-        parent::build();
+        $this->logger = null;
+        $this->connector = $connectorFactory->forCart();
     }
 
-    public function setLogger(LoggerInterface $logger)
+    public function setLogger(LoggerInterface $logger): void
     {
         $this->logger = $logger;
     }
 
     /**
-     * @inheritdoc
+     * @throws \Raketa\BackendTestTask\Infrastructure\ConnectorException
      */
-    public function saveCart(Cart $cart)
+    public function saveCart(Cart $cart): bool
     {
         try {
-            $this->connector->set($cart, session_id());
-        } catch (Exception $e) {
-            $this->logger->error('Error');
+            $sessionId = session_id();
+            return $this->connector->set($sessionId, $cart);
+        } catch (ConnectorException $e) {
+            $this->logger?->error('SaveCartError', ['session_id' => $sessionId, 'exception' => $e->__toString()]);
+
+            // Попробовать перейти на другой канал для корзины?
+            // Иначе, остаётся только прокинуть ошибку дальше.
+            throw $e;
         }
     }
 
     /**
-     * @return ?Cart
+     * @throws \Raketa\BackendTestTask\Infrastructure\ConnectorException
      */
-    public function getCart()
+    public function getCart(): ?Cart
     {
         try {
-            return $this->connector->get(session_id());
-        } catch (Exception $e) {
-            $this->logger->error('Error');
-        }
+            $sessionId = session_id();
+            return $this->connector->get($sessionId);
+        } catch (ConnectorException $e) {
+            $this->logger?->error('GetCartError', ['session_id' => $sessionId, 'exception' => $e->__toString()]);
 
-        return new Cart(session_id(), []);
+            // Попробовать перейти на другой канал для корзины?
+            // Иначе, остаётся только прокинуть ошибку дальше.
+            throw $e;
+        }
     }
 }

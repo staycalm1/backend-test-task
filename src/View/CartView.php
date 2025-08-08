@@ -6,6 +6,8 @@ namespace Raketa\BackendTestTask\View;
 
 use Raketa\BackendTestTask\Domain\Cart;
 use Raketa\BackendTestTask\Repository\ProductRepository;
+use function bcadd;
+use function bcmul;
 
 readonly class CartView
 {
@@ -14,18 +16,23 @@ readonly class CartView
     ) {
     }
 
+    /**
+     * @throws \Doctrine\DBAL\Exception
+     */
     public function toArray(Cart $cart): array
     {
+        $customer = $cart->getCustomer();
+
         $data = [
             'uuid' => $cart->getUuid(),
             'customer' => [
-                'id' => $cart->getCustomer()->getId(),
-                'name' => implode(' ', [
-                    $cart->getCustomer()->getLastName(),
-                    $cart->getCustomer()->getFirstName(),
-                    $cart->getCustomer()->getMiddleName(),
-                ]),
-                'email' => $cart->getCustomer()->getEmail(),
+                'id' => $customer->getId(),
+                'name' => implode(' ', array_filter([
+                    $customer->getLastName(),
+                    $customer->getFirstName(),
+                    $customer->getMiddleName(),
+                ])),
+                'email' => $customer->getEmail(),
             ],
             'payment_method' => $cart->getPaymentMethod(),
         ];
@@ -33,13 +40,14 @@ readonly class CartView
         $total = 0;
         $data['items'] = [];
         foreach ($cart->getItems() as $item) {
-            $total += $item->getPrice() * $item->getQuantity();
-            $product = $this->productRepository->getByUuid($item->getProductUuid());
+            $subtotal = bcmul($item->getPrice(), $item->getQuantity(), 2);
+            $total = bcadd($total, $subtotal, 2);
 
+            $product = $this->productRepository->getByUuid($item->getProductUuid());
             $data['items'][] = [
                 'uuid' => $item->getUuid(),
                 'price' => $item->getPrice(),
-                'total' => $total,
+                'total' => $subtotal,
                 'quantity' => $item->getQuantity(),
                 'product' => [
                     'id' => $product->getId(),
@@ -50,7 +58,6 @@ readonly class CartView
                 ],
             ];
         }
-
         $data['total'] = $total;
 
         return $data;

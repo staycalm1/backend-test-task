@@ -1,49 +1,44 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Raketa\BackendTestTask\Controller;
 
+use Throwable;
+use Psr\Log\LoggerInterface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
-use Raketa\BackendTestTask\Repository\CartManager;
 use Raketa\BackendTestTask\View\CartView;
+use Raketa\BackendTestTask\Repository\CartManager;
 
 readonly class GetCartController
 {
     public function __construct(
-        public CartView $cartView,
-        public CartManager $cartManager
+        private CartView $cartView,
+        private CartManager $cartManager,
+        private LoggerInterface $logger,
     ) {
     }
 
     public function get(RequestInterface $request): ResponseInterface
     {
-        $response = new JsonResponse();
-        $cart = $this->cartManager->getCart();
+        try {
+            $this->cartManager->setLogger($this->logger);
 
-        if (! $cart) {
-            $response->getBody()->write(
-                json_encode(
-                    ['message' => 'Cart not found'],
-                    JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
-                )
-            );
+            $cart = $this->cartManager->getCart();
 
-            return $response
-                ->withHeader('Content-Type', 'application/json; charset=utf-8')
-                ->withStatus(404);
-        } else {
-            $response->getBody()->write(
-                json_encode(
-                    $this->cartView->toArray($cart),
-                    JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
-                )
-            );
+            if (!$cart) {
+                return JsonResponse::fromArray(['message' => 'Cart not found'])
+                    ->withStatus(404);
+            }
+
+            return JsonResponse::fromArray($this->cartView->toArray($cart))
+                ->withStatus(200);
+        } catch (Throwable $t) {
+            $this->logger->error('GetCartControllerError', ['exception' => $t->__toString()]);
+
+            return JsonResponse::fromArray(['status' => 'error', 'message' => 'Сервис временно недоступен'])
+                ->withStatus(503);
         }
-
-        return $response
-            ->withHeader('Content-Type', 'application/json; charset=utf-8')
-            ->withStatus(404);
     }
 }
